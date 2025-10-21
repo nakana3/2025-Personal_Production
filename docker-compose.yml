@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # 1. PHP アプリケーションサービス
+  app:
+    build:
+      context: ./backend
+    container_name: keep-info-app
+    # Host:8080 -> Container:80 でWebアクセス
+    ports:
+      - "8080:80"
+    volumes:
+      # backend/をコンテナのWebルートにマウント
+      - ./backend:/var/www/html
+      # tools/をコンテナ内の検証用ディレクトリにマウント
+      - ./tools:/var/www/tools
+    environment:
+      # PHPからDB接続設定を読み込めるように環境変数を設定
+      DB_HOST: db
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASS: ${MYSQL_PASSWORD}
+      TZ: ${PHP_TIMEZONE}
+    depends_on:
+      - db
+    restart: always
+    # コンテナのappサービスに強制維持コマンドを適用
+    command: sleep infinity
+
+  # 2. MySQL データベースサービス
+  db:
+    image: mysql:8.0
+    container_name: keep-info-db
+    ports:
+      - "3307:3306"
+    volumes:
+      # init.sqlを起動時に自動実行
+      - ./mysql:/docker-entrypoint-initdb.d
+      - db-data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    restart: always
+
+# ボリューム定義 (DBデータ永続化用)
+volumes:
+  db-data:
