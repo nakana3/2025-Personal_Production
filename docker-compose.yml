@@ -1,49 +1,44 @@
 version: '3.8'
 
 services:
-  # 1. PHP アプリケーションサービス
+  # 1. Node.js アプリケーションサービス
   app:
+    # 🚨 imageまたはbuildでNode.jsを指定
     build:
-      context: ./backend
+      context: ./server # 参照するフォルダ
     container_name: keep-info-app
-    # Host:8080 -> Container:80 でWebアクセス
     ports:
-      - "8080:80"
+      - "8080:8080" # ホスト:コンテナ ポートマッピング
     volumes:
-      # backend/をコンテナのWebルートにマウント
-      - ./backend:/var/www/html
-      # tools/をコンテナ内の検証用ディレクトリにマウント
-      - ./tools:/var/www/tools
+      - ./server:/usr/src/app
+      - /usr/src/app/node_modules
     environment:
-      # PHPからDB接続設定を読み込めるように環境変数を設定
-      DB_HOST: db
-      DB_NAME: ${MYSQL_DATABASE}
-      DB_USER: ${MYSQL_USER}
-      DB_PASS: ${MYSQL_PASSWORD}
-      TZ: ${PHP_TIMEZONE}
+      # DB接続情報 (NestJSが使うURL形式)
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${PORT}
     depends_on:
       - db
     restart: always
-    # コンテナのappサービスに強制維持コマンドを適用
-    command: sleep infinity
+    # NestJSのホットリロード起動コマンド
+    command: npm run start:dev
+    # command: npm run start # 🚨 起動コマンドをNode.jsに変更、リトライロジック
 
-  # 2. MySQL データベースサービス
+    # 2. MySQL / PostgreSQL データベースサービス (PostgreSQLへの変更例)
   db:
-    image: mysql:8.0
+    image: postgres:15-alpine
     container_name: keep-info-db
     ports:
-      - "3307:3306"
+      - "5432:5432" # 🚨 PostgreSQLの標準ポート
     volumes:
-      # init.sqlを起動時に自動実行
-      - ./mysql:/docker-entrypoint-initdb.d
-      - db-data:/var/lib/mysql
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql # PostgreSQL初期化ファイル
+      - db-data:/var/lib/postgresql/data # データ永続化
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      # PostgreSQL標準の環境変数を使用
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     restart: always
 
-# ボリューム定義 (DBデータ永続化用)
 volumes:
   db-data:
